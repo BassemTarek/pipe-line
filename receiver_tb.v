@@ -1,0 +1,91 @@
+`timescale 10ps/1ps
+
+module rec_tb;
+reg RX_clk , rst ,input_signal ,snum ,dnum;
+reg [1:0] par;
+wire [7:0] data ;
+wire parity_warning,frame_warning;
+reg [7:0] data_comp;
+reg [3:0] c;
+reg [2:0] i ;
+event reset,reset_done;
+
+  RXRX M0(
+  .RX_clk (RX_clk),
+  .rst (rst),
+  .input_signal (input_signal),
+  .snum (snum),
+  .dnum (dnum),
+  .par (par),
+  .data (data),
+  .parity_warning (parity_warning),
+  .frame_warning (frame_warning)
+  );
+
+  initial begin
+    c<=0;
+    i<=0;
+    RX_clk<=0;
+    input_signal<=0;
+    data_comp<=0;
+    snum<=1;
+    dnum<=0;
+    rst<=0;
+    par<=2'b00;
+  end
+
+//clock setup
+  always begin
+  #5 RX_clk=!RX_clk;
+  end
+
+    //starting with reset event
+  initial begin
+    #5-> reset;
+    end
+
+    //reset event
+    always@(reset)
+    begin
+    @(negedge RX_clk); //signal=1
+    rst=1; input_signal=1;
+    @(negedge RX_clk);//signal=0
+    rst=0;input_signal=0;
+    -> reset_done;
+    end
+
+
+always@(reset_done)
+begin
+    #160;//signals sent are 0,0,1,0,1,0,1,0,1,1,1,1,1,...
+    repeat(144)begin
+     @(negedge RX_clk);
+     c<=c+1;
+     if (c==15) begin
+     c<=0;
+     data_comp[i]<=input_signal;
+     input_signal=!input_signal;  //after 16 clock cycles toggle signal
+     i<=i+1;
+     if (i==7 || data_comp==8'b10101010) i<=0; end
+    end 
+end
+
+ 
+
+    initial begin
+    #2020; 
+     if (data_comp != data) $display("Data Error");
+     else begin $display("No error found"); data_comp<=0; end
+    #80;
+     snum<=0;
+     ->reset;
+   end 
+
+   initial begin 
+     #4120;
+     if (data_comp != data) $display("Data Error");
+     else begin $display("No error found"); data_comp<=0; end
+     end
+
+
+endmodule
